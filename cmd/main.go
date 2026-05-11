@@ -18,7 +18,6 @@ import (
 )
 
 func main() {
-	
 	logLevel := slog.LevelDebug
 	if os.Getenv("GIN_MODE") == "release" {
 		logLevel = slog.LevelInfo
@@ -43,21 +42,25 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	slotRepo := repository.NewSlotRepository(db)
 	apptRepo := repository.NewAppointmentRepository(db)
+	statsRepo := repository.NewStatsRepository(db)
 
 	userSvc := service.NewUserService(userRepo)
 	slotSvc := service.NewSlotService(slotRepo)
 	apptSvc := service.NewAppointmentService(apptRepo)
+	statsSvc := service.NewStatsService(statsRepo)
 
 	authHandler := handler.NewAuthHandler(userSvc, cfg.JWTSecret, cfg.JWTExpiryHours)
 	userHandler := handler.NewUserHandler(userSvc)
 	slotHandler := handler.NewSlotHandler(slotSvc)
 	apptHandler := handler.NewAppointmentHandler(apptSvc)
+	statsHandler := handler.NewStatsHandler(statsSvc)
 
 	router := handler.SetupRouter(handler.RouterDeps{
 		Auth:        authHandler,
 		User:        userHandler,
 		Slot:        slotHandler,
 		Appointment: apptHandler,
+		Stats:       statsHandler,
 		JWTSecret:   cfg.JWTSecret,
 	})
 

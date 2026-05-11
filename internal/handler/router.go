@@ -14,13 +14,14 @@ type RouterDeps struct {
 	User        *UserHandler
 	Slot        *SlotHandler
 	Appointment *AppointmentHandler
+	Stats       *StatsHandler
 	JWTSecret   string
 }
 
 func SetupRouter(deps RouterDeps) *gin.Engine {
 	r := gin.New()
-
 	r.Use(gin.Recovery())
+	r.Use(middleware.RateLimitMiddleware())
 	r.Use(requestLogger())
 
 	r.GET("/health", func(c *gin.Context) {
@@ -43,6 +44,7 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 	slots := auth.Group("/slots")
 	{
 		slots.POST("", middleware.RequireRole(models.RoleDoctor), deps.Slot.Create)
+		slots.POST("/bulk", middleware.RequireRole(models.RoleDoctor), deps.Slot.BulkCreate)
 		slots.GET("", deps.Slot.GetAvailable)
 		slots.GET("/my", middleware.RequireRole(models.RoleDoctor), deps.Slot.GetMySlots)
 		slots.DELETE("/:id", middleware.RequireRole(models.RoleDoctor), deps.Slot.Cancel)
@@ -53,7 +55,13 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		appts.POST("", middleware.RequireRole(models.RolePatient), deps.Appointment.Book)
 		appts.GET("", deps.Appointment.GetMyAppointments)
 		appts.GET("/:id", deps.Appointment.GetByID)
+		appts.PATCH("/:id/confirm", middleware.RequireRole(models.RoleDoctor), deps.Appointment.Confirm)
 		appts.DELETE("/:id", deps.Appointment.Cancel)
+	}
+
+	admin := auth.Group("/admin", middleware.RequireRole(models.RoleAdmin))
+	{
+		admin.GET("/stats", deps.Stats.GetStats)
 	}
 
 	return r
@@ -63,15 +71,13 @@ func requestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
-
 		c.Next()
-
 		slog.Info("request",
-			"method",  c.Request.Method,
-			"path",    path,
-			"status",  c.Writer.Status(),
+			"method", c.Request.Method,
+			"path", path,
+			"status", c.Writer.Status(),
 			"latency", time.Since(start).String(),
-			"ip",      c.ClientIP(),
+			"ip", c.ClientIP(),
 		)
 	}
 }

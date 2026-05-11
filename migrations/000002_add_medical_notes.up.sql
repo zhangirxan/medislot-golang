@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN medical_notes TEXT NOT NULL DEFAULT '';
